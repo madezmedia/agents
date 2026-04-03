@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # OpenClaw Gateway - Main orchestration service
+  openclaw-gateway:
+    image: node:20-alpine
+    container_name: openclaw-gateway
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./state:/app/state
+    environment:
+      - NODE_ENV=production
+      - KRAKEN_API_KEY=${KRAKEN_API_KEY}
+      - KRAKEN_API_SECRET=${KRAKEN_API_SECRET}
+      - BASE_RPC_URL=${BASE_RPC_URL:-https://mainnet.base.org}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ERC8004_REGISTRY=${ERC8004_REGISTRY}
+      - AERODROME_ROUTER=${AERODROME_ROUTER:-0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43}
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm start"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for state management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: openclaw-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Sentry Agent - Market monitoring cron
+  sentry:
+    image: node:20-alpine
+    container_name: openclaw-sentry
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./state:/app/state
+    environment:
+      - AGENT_TYPE=sentry
+      - KRAKEN_API_KEY=${KRAKEN_API_KEY}
+      - AERODROME_ROUTER=${AERODROME_ROUTER}
+      - BASE_RPC_URL=${BASE_RPC_URL}
+      - REDIS_URL=redis://redis:6379
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    # Runs every 30 seconds
+    command: sh -c "while true; do node agents/sentry.js; sleep 30; done"
+
+  # Auditor Agent - Periodic audit reports
+  auditor:
+    image: node:20-alpine
+    container_name: openclaw-auditor
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./state:/app/state
+    environment:
+      - AGENT_TYPE=auditor
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - BASE_RPC_URL=${BASE_RPC_URL}
+      - ERC8004_REGISTRY=${ERC8004_REGISTRY}
+      - REDIS_URL=redis://redis:6379
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    # Generates audit reports every hour
+    command: sh -c "while true; do node agents/auditor.js; sleep 3600; done"
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: openclaw-network

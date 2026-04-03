@@ -1,0 +1,69 @@
+# Elestio Deployment Configuration
+# Deploy with: elestio deploy --config elestio.yml
+
+config:
+  version: 1
+
+service:
+  name: veritas-trade-os
+  description: "Verifiable AI Trading Orchestration Platform"
+
+  # Choose your cloud provider
+  # Options: digital-ocean, aws-lightsail, linode, vultr, scaleway, hetzner, tensordock, netcup, azure
+  provider: hetzner
+
+  # Datacenter region
+  region: fsn1  # Falkenstein, Germany (low latency to European exchanges)
+
+  # Instance size
+  plan: SMALL-1C-2G  # 1 vCPU, 2GB RAM - good for development
+  # production: MEDIUM-2C-4G or LARGE-4C-8G
+
+  # Deployment configuration
+  deployment:
+    type: docker-compose
+    compose_file: docker-compose.yml
+
+  # Environment variables (set via Elestio dashboard)
+  env:
+    - KRAKEN_API_KEY
+    - KRAKEN_API_SECRET
+    - GEMINI_API_KEY
+    - BASE_RPC_URL
+    - PRIVATE_KEY
+    - ERC8004_REGISTRY
+
+  # Exposed ports
+  ports:
+    - port: 3000
+      protocol: http
+      public: true
+      ssl: true  # Elestio auto-provisions SSL
+
+  # Health check
+  healthcheck:
+    path: /health
+    interval: 30s
+
+  # Backups
+  backup:
+    enabled: true
+    frequency: daily
+    retention: 7  # Keep 7 days of backups
+
+  # Monitoring
+  monitoring:
+    enabled: true
+    alerts:
+      - type: cpu
+        threshold: 80
+      - type: memory
+        threshold: 85
+      - type: disk
+        threshold: 90
+
+# Scaling (future)
+# autoscale:
+#   min_instances: 1
+#   max_instances: 3
+#   cpu_threshold: 70
