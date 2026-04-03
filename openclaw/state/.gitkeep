@@ -1,0 +1,9 @@
+# State directory for agent data
+# These files are generated at runtime:
+# - market_data.json
+# - health_score.json
+# - positions.json
+# - executions.json
+# - attestations.json
+# - audit_reports.json
+# - config.json
